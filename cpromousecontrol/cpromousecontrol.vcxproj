@@ -141,7 +141,7 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="mathbase.cpp" />
-    <ClCompile Include="MouseControl.cpp" />
+    <ClCompile Include="mousecontrol.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.h" />

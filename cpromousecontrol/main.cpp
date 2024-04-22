@@ -1010,5 +1010,6 @@ int main() {
 
     LPSTR lpCmdLine = GetCommandLineA();
    
-    return WinMain(GetModuleHandle(NULL), NULL, lpCmdLine, SW_SHOWNORMAL);
+    WinMain(GetModuleHandle(NULL), NULL, lpCmdLine, SW_SHOWNORMAL);
+    return 0;
 }

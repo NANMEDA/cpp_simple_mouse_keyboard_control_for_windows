@@ -10,10 +10,12 @@ POINT SPECIAL_FOR_RANDOMGOCENTER_AS_NO_SPACE;
 bool isSpecialPointShouldReget = true;
 
 void TimerCanDetect(int times) {
+	double t=0;
 	auto start = std::chrono::high_resolution_clock::now();
-	while (duration < times) {
+	while (t < times) {
 		auto end = std::chrono::high_resolution_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+		t = duration.count();
 		if (exitFlag) { return; }
 		Sleep(20);
 	}
@@ -28,7 +30,7 @@ void Click(int kind) {
 		input.mi.time = 0;
 		SendInput(1, &input, sizeof(INPUT));
 	}
-	else if(kind == 2){
+	else if (kind == 2) {
 		input.mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
 		input.mi.time = 0;
 		SendInput(1, &input, sizeof(INPUT));
@@ -55,23 +57,23 @@ void Click(int kind) {
 
 
 void Move(POINT I, POINT L, double speed,
-	int style_0,	//{ L"å¢é‡ç§»åŠ¨", L"åæ ‡ç§»åŠ¨", L"éšæœºç§»åŠ¨", L"éšæœºç§»åŠ¨ï¼ˆå‘å¿ƒï¼‰", L"<ç©º>" },
-	int style_1,	//{ L"ç§»åŠ¨æ— è¯¯å·®", L"å‘å¿ƒéšæœºæ¸¸èµ°", L"<ç©º/æ— è¯¯å·®>" }, 
-	int style_2,	//{ L"é€Ÿåº¦æ— è¯¯å·®", L"é€Ÿåº¦æ­£å¤ª", L"<ç©º/æ— è¯¯å·®>" }
-	double time=500,
-	double move_arg=3,
-	double speed_arg=5
-	) {
-	
-	I.x = I.x * 65535 / screenWidth;
-	L.x = L.x * 65535 / screenWidth;
-	I.y = I.y * 65535 / screenHeight;
-	L.y = L.y * 65535 / screenHeight;
+	int style_0,	//{ L"ÔöÁ¿ÒÆ¶¯", L"×ø±êÒÆ¶¯", L"Ëæ»úÒÆ¶¯", L"Ëæ»úÒÆ¶¯£¨ÏòĞÄ£©", L"<¿Õ>" },
+	int style_1,	//{ L"ÒÆ¶¯ÎŞÎó²î", L"ÏòĞÄËæ»úÓÎ×ß", L"<¿Õ/ÎŞÎó²î>" }, 
+	int style_2,	//{ L"ËÙ¶ÈÎŞÎó²î", L"ËÙ¶ÈÕıÌ«", L"<¿Õ/ÎŞÎó²î>" }
+	double time = 500,
+	double move_arg = 3,
+	double speed_arg = 5
+) {
+
+	I.x = I.x * 65535.0 / screenWidth;
+	L.x = L.x * 65535.0 / screenWidth;
+	I.y = I.y * 65535.0 / screenHeight;
+	L.y = L.y * 65535.0 / screenHeight;
 
 	double step_total;
 	POINT NOW = I;
 	POINT GO;
-	double ex=0, ey=0;
+	double ex = 0, ey = 0;
 	INPUT input;
 	speed = speed / 50.0;
 	if (isSpecialPointShouldReget) {
@@ -82,107 +84,32 @@ void Move(POINT I, POINT L, double speed,
 	}
 
 	switch (style_0) {
-		case 0:
-		case 1: {
-			double dx = L.x - I.x; double dy = L.y - I.y; double dis = sqrt(dx * dx + dy * dy);
-			double angle = atan2(dy, dx);
-			step_total = pow(dis * 6 / speed, 1.0 / 3);
-			for (double step = 0; step < step_total; step++) {
-				auto start = std::chrono::high_resolution_clock::now();
-				if (style_2) {
-					//æ²¡åšæï¼Ÿ.?
-					GO = TrajPlan(speed * cos(angle), speed * sin(angle), step, step_total, I);
-				}
-				else {
-					GO = TrajPlan(speed * cos(angle), speed * sin(angle), step, step_total, I);
-				}
-				if (style_1) {
-					ex = RandomWalkPreferCenter(ex, 50.0 , 0, move_arg / exp(5.0 * step / step_total));
-					ey = RandomWalkPreferCenter(ey, 50.0 , 0, move_arg / exp(5.0 * step / step_total));
-					GO.x = GO.x + ex;
-					GO.y = GO.y + ey;
-				}
-				if (!style_0) {
-					input.type = INPUT_MOUSE;
-					input.mi.dwFlags = MOUSEEVENTF_MOVE;
-					input.mi.dx = (GO.x- NOW.x)* screenWidth/65535.0;
-					input.mi.dy = (GO.y - NOW.y) * screenHeight / 65535.0;
-					input.mi.time = 0;
-					int randt = NormalDistribution(20, 5);
-					auto end = std::chrono::high_resolution_clock::now();
-					auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-					if (duration.count() < randt) {
-						Sleep(randt - duration.count());
-					}
-					if (exitFlag) { return; }
-					SendInput(1, &input, sizeof(INPUT));
-					NOW = GO;
-				}
-				else {
-
-					input.type = INPUT_MOUSE;
-					input.mi.dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE;
-					POINT nowPos;
-					GetCursorPos(&nowPos);
-					nowPos.x = nowPos.x * 65535 / screenWidth;
-					nowPos.y = nowPos.y * 65535 / screenHeight;
-					input.mi.dx = GO.x;
-					input.mi.dy = GO.y;
-					input.mi.time = 0;
-					int randt = NormalDistribution(20, 5);
-					auto end = std::chrono::high_resolution_clock::now();
-					auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-					if (duration.count() < randt) {
-						Sleep(randt - duration.count());
-					}
-					if (exitFlag) { return; }
-					SendInput(1, &input, sizeof(INPUT));
-					NOW = GO;
-				}
+	case 0:
+	case 1: {
+		double dx = L.x - I.x; double dy = L.y - I.y; double dis = sqrt(dx * dx + dy * dy);
+		double angle = atan2(dy, dx);
+		step_total = pow(dis * 6 / speed, 1.0 / 3);
+		for (double step = 0; step < step_total; step++) {
+			auto start = std::chrono::high_resolution_clock::now();
+			if (style_2) {
+				//Ã»×öÄó£¿.?
+				GO = TrajPlan(speed * cos(angle), speed * sin(angle), step, step_total, I);
 			}
-		}
-			  break;
-
-		case 2:
-			speed *=1000;
-			for (double i = 0; i < time / 20; i++) {
-				auto start = std::chrono::high_resolution_clock::now();
-				if (style_2) {
-					double randspeed = speed + NormalDistribution(speed, speed_arg);
-					GO = RandomWalk(NOW, randspeed);
-				}
-				else {
-					GO = RandomWalk(NOW, speed);
-				}	
+			else {
+				GO = TrajPlan(speed * cos(angle), speed * sin(angle), step, step_total, I);
+			}
+			if (style_1) {
+				ex = RandomWalkPreferCenter(ex, 50.0, 0, move_arg / exp(5.0 * step / step_total));
+				ey = RandomWalkPreferCenter(ey, 50.0, 0, move_arg / exp(5.0 * step / step_total));
+				GO.x = GO.x + ex;
+				GO.y = GO.y + ey;
+			}
+			if (!style_0) {
 				input.type = INPUT_MOUSE;
 				input.mi.dwFlags = MOUSEEVENTF_MOVE;
 				input.mi.dx = (GO.x - NOW.x) * screenWidth / 65535.0;
 				input.mi.dy = (GO.y - NOW.y) * screenHeight / 65535.0;
 				input.mi.time = 0;
-				int randt = NormalDistribution(20, 5);
-				auto end = std::chrono::high_resolution_clock::now();
-				auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-				if (duration.count()< randt) {
-					Sleep(randt - duration.count());
-				}
-				if (exitFlag) { return; }
-				
-				SendInput(1, &input, sizeof(INPUT));
-				NOW = GO;
-			}
-			break;
-
-		case 3:
-			speed *= 1000;
-			for (double i = 0; i < time / 20; i++) {
-				auto start = std::chrono::high_resolution_clock::now();
-				if (style_2) {
-					double randspeed = speed + NormalDistribution(speed, speed_arg);
-					GO = RandomWalkPreferCenter(NOW, randspeed, SPECIAL_FOR_RANDOMGOCENTER_AS_NO_SPACE, 0.7);
-				}
-				else {
-					GO = RandomWalkPreferCenter(NOW, speed, SPECIAL_FOR_RANDOMGOCENTER_AS_NO_SPACE, 0.7);
-				}
 				int randt = NormalDistribution(20, 5);
 				auto end = std::chrono::high_resolution_clock::now();
 				auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -190,29 +117,104 @@ void Move(POINT I, POINT L, double speed,
 					Sleep(randt - duration.count());
 				}
 				if (exitFlag) { return; }
-
-				input.type = INPUT_MOUSE;
-				input.mi.dwFlags = MOUSEEVENTF_MOVE;
-				input.mi.dx = (GO.x - NOW.x) * screenWidth / 65535.0;
-				input.mi.dy = (GO.y - NOW.y) * screenHeight / 65535.0;
-				input.mi.time = 0;
 				SendInput(1, &input, sizeof(INPUT));
 				NOW = GO;
 			}
-			break;
+			else {
+
+				input.type = INPUT_MOUSE;
+				input.mi.dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE;
+				POINT nowPos;
+				GetCursorPos(&nowPos);
+				nowPos.x = nowPos.x * 65535.0 / screenWidth;
+				nowPos.y = nowPos.y * 65535.0 / screenHeight;
+				input.mi.dx = GO.x;
+				input.mi.dy = GO.y;
+				input.mi.time = 0;
+				int randt = NormalDistribution(20, 5);
+				auto end = std::chrono::high_resolution_clock::now();
+				auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+				if (duration.count() < randt) {
+					Sleep(randt - duration.count());
+				}
+				if (exitFlag) { return; }
+				SendInput(1, &input, sizeof(INPUT));
+				NOW = GO;
+			}
+		}
+	}
+		  break;
+
+	case 2:
+		speed *= 1000;
+		for (double i = 0; i < time / 20; i++) {
+			auto start = std::chrono::high_resolution_clock::now();
+			if (style_2) {
+				double randspeed = speed + NormalDistribution(speed, speed_arg);
+				GO = RandomWalk(NOW, randspeed);
+			}
+			else {
+				GO = RandomWalk(NOW, speed);
+			}
+			input.type = INPUT_MOUSE;
+			input.mi.dwFlags = MOUSEEVENTF_MOVE;
+			input.mi.dx = (GO.x - NOW.x) * screenWidth / 65535.0;
+			input.mi.dy = (GO.y - NOW.y) * screenHeight / 65535.0;
+			input.mi.time = 0;
+			int randt = NormalDistribution(20, 5);
+			auto end = std::chrono::high_resolution_clock::now();
+			auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+			if (duration.count() < randt) {
+				Sleep(randt - duration.count());
+			}
+			if (exitFlag) { return; }
+
+			SendInput(1, &input, sizeof(INPUT));
+			NOW = GO;
+		}
+		break;
+
+	case 3:
+		speed *= 1000;
+		for (double i = 0; i < time / 20; i++) {
+			auto start = std::chrono::high_resolution_clock::now();
+			if (style_2) {
+				double randspeed = speed + NormalDistribution(speed, speed_arg);
+				GO = RandomWalkPreferCenter(NOW, randspeed, SPECIAL_FOR_RANDOMGOCENTER_AS_NO_SPACE, 0.7);
+			}
+			else {
+				GO = RandomWalkPreferCenter(NOW, speed, SPECIAL_FOR_RANDOMGOCENTER_AS_NO_SPACE, 0.7);
+			}
+			int randt = NormalDistribution(20, 5);
+			auto end = std::chrono::high_resolution_clock::now();
+			auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+			if (duration.count() < randt) {
+				Sleep(randt - duration.count());
+			}
+			if (exitFlag) { return; }
+
+			input.type = INPUT_MOUSE;
+			input.mi.dwFlags = MOUSEEVENTF_MOVE;
+			input.mi.dx = (GO.x - NOW.x) * screenWidth / 65535.0;
+			input.mi.dy = (GO.y - NOW.y) * screenHeight / 65535.0;
+			input.mi.time = 0;
+			SendInput(1, &input, sizeof(INPUT));
+			NOW = GO;
+		}
+		break;
 	}
 }
 
-void MouseControl_2(int kind,	//{ L"å¢é‡ç§»åŠ¨", L"åæ ‡ç§»åŠ¨", L"éšæœºç§»åŠ¨", L"éšæœºç§»åŠ¨ï¼ˆå‘å¿ƒï¼‰", L"<ç©º>" },
-	int m_style,				//{ L"ç§»åŠ¨æ— è¯¯å·®", L"å‘å¿ƒéšæœºæ¸¸èµ°", L"<ç©º/æ— è¯¯å·®>" }, 
-	int s_style,				//{ L"é€Ÿåº¦æ— è¯¯å·®", L"é€Ÿåº¦æ­£å¤ª", L"<ç©º/æ— è¯¯å·®>" }
-	int p_style,				//{ L"æ— æŒ‰ä½", L"å·¦é”®æ‹–åŠ¨", L"å³é”®æ‹–åŠ¨", L"<ç©º/æ— æŒ‰ä½>" }
-	POINT L,					//é‚£ä¸ªè¯»å…¥çš„åæ ‡
-	double speed,				//è¯»å…¥çš„é€Ÿåº¦
-	double time = 500,			//ä»…é™äºéšæœºç§»åŠ¨çš„
-	double move_arg = 3,		//å‘å¿ƒéšæœºæ¸¸èµ°çš„concentrate
-	double speed_arg = 5		//é€Ÿåº¦æ­£å¤ª
-	) {
+void MouseControl_2(int kind,	//{ L"ÔöÁ¿ÒÆ¶¯", L"×ø±êÒÆ¶¯", L"Ëæ»úÒÆ¶¯", L"Ëæ»úÒÆ¶¯£¨ÏòĞÄ£©", L"<¿Õ>" },
+	int m_style,				//{ L"ÒÆ¶¯ÎŞÎó²î", L"ÏòĞÄËæ»úÓÎ×ß", L"<¿Õ/ÎŞÎó²î>" }, 
+	int s_style,				//{ L"ËÙ¶ÈÎŞÎó²î", L"ËÙ¶ÈÕıÌ«", L"<¿Õ/ÎŞÎó²î>" }
+	int p_style,				//{ L"ÎŞ°´×¡", L"×ó¼üÍÏ¶¯", L"ÓÒ¼üÍÏ¶¯", L"<¿Õ/ÎŞ°´×¡>" }
+	POINT L,					//ÄÇ¸ö¶ÁÈëµÄ×ø±ê
+	double speed,				//¶ÁÈëµÄËÙ¶È
+	double time = 500,			//½öÏŞÓÚËæ»úÒÆ¶¯µÄ
+	double move_arg = 3,		//ÏòĞÄËæ»úÓÎ×ßµÄconcentrate
+	double speed_arg = 5		//ËÙ¶ÈÕıÌ«
+) {
 	POINT cursorPos;
 	GetCursorPos(&cursorPos);
 	INPUT input;
@@ -231,18 +233,18 @@ void MouseControl_2(int kind,	//{ L"å¢é‡ç§»åŠ¨", L"åæ ‡ç§»åŠ¨", L"éšæœºç§»å
 	}
 
 	switch (kind) {
-		case 0: {
-			L.x += cursorPos.x;
-			L.y += cursorPos.y;
-			Move(cursorPos, L, speed, kind, m_style, s_style, NULL, NULL, speed_arg);
-		}
-		break;
+	case 0: {
+		L.x += cursorPos.x;
+		L.y += cursorPos.y;
+		Move(cursorPos, L, speed, kind, m_style, s_style, NULL, NULL, speed_arg);
+	}
+		  break;
 
-		case 1:
-		case 2:
-		case 3:
-			Move(cursorPos, L, speed, kind, m_style, s_style, time, move_arg, speed_arg);
-			break;
+	case 1:
+	case 2:
+	case 3:
+		Move(cursorPos, L, speed, kind, m_style, s_style, time, move_arg, speed_arg);
+		break;
 	}
 
 	if (p_style == 1) {
@@ -262,52 +264,52 @@ void MouseControl_2(int kind,	//{ L"å¢é‡ç§»åŠ¨", L"åæ ‡ç§»åŠ¨", L"éšæœºç§»å
 	return;
 }
 
-void MouseControl_1(int kind,	//{ L"å·¦é”®ç‚¹å‡»", L"å³é”®ç‚¹å‡»", L"å·¦é”®æŒ‰ä½", L"å³é”®æŒ‰ä½", L"ç©ºé—²", L"<ç©º>" } 
-	int style,					//{ L"å¹³å‡", L"æ­£å¤ª", L"ç²¾å‡†", L"<ç©º/ç²¾å‡†>" }
-	int num,					//{ L"å•æ¬¡/å€", L"å¤šæ¬¡/å€", L"<ç©º/å•>" }
-	int times,					
-	int style_arg = 1,			
-	int num_arg = 1) {		
+void MouseControl_1(int kind,	//{ L"×ó¼üµã»÷", L"ÓÒ¼üµã»÷", L"×ó¼ü°´×¡", L"ÓÒ¼ü°´×¡", L"¿ÕÏĞ", L"<¿Õ>" } 
+	int style,					//{ L"Æ½¾ù", L"ÕıÌ«", L"¾«×¼", L"<¿Õ/¾«×¼>" }
+	int num,					//{ L"µ¥´Î/±¶", L"¶à´Î/±¶", L"<¿Õ/µ¥>" }
+	int times,
+	int style_arg = 1,
+	int num_arg = 1) {
 	INPUT input;
 	input.type = INPUT_MOUSE;
 	int randomtime;
 	for (int i = 0; i < num_arg; i++) {
-		if (exitFlag) {return;}
-		switch(style) {
-			case 0:
-				randomtime = (int)AverageDistribution(times, style_arg);
-				break;
-			case 1:
-				randomtime = (int)NormalDistribution(times, style_arg);
-				break;
-			case 2:
-				randomtime = times;
-				break;
+		if (exitFlag) { return; }
+		switch (style) {
+		case 0:
+			randomtime = (int)AverageDistribution(times, style_arg);
+			break;
+		case 1:
+			randomtime = (int)NormalDistribution(times, style_arg);
+			break;
+		case 2:
+			randomtime = times;
+			break;
 		}
 		switch (kind) {
-			case 0:
-				Click(1);
-				TimerCanDetect(randomtime);
-				break;
-			case 1:
-				Click(2);
-				TimerCanDetect(randomtime);
-				break;
-			case 2:
-				input.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
-				input.mi.time = 0;
-				SendInput(1, &input, sizeof(INPUT));
-				TimerCanDetect(randomtime);
-				break;
-			case 3:
-				input.mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
-				input.mi.time = 0;
-				SendInput(1, &input, sizeof(INPUT));
-				TimerCanDetect(randomtime);
-				break;
-			case 4:
-				TimerCanDetect(randomtime);
-				break;
+		case 0:
+			Click(1);
+			TimerCanDetect(randomtime);
+			break;
+		case 1:
+			Click(2);
+			TimerCanDetect(randomtime);
+			break;
+		case 2:
+			input.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+			input.mi.time = 0;
+			SendInput(1, &input, sizeof(INPUT));
+			TimerCanDetect(randomtime);
+			break;
+		case 3:
+			input.mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
+			input.mi.time = 0;
+			SendInput(1, &input, sizeof(INPUT));
+			TimerCanDetect(randomtime);
+			break;
+		case 4:
+			TimerCanDetect(randomtime);
+			break;
 		}
 	}
 	if (kind == 2) {

@@ -21,7 +21,7 @@
     <ClCompile Include="mathbase.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="MouseControl.cpp">
+    <ClCompile Include="mousecontrol.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
