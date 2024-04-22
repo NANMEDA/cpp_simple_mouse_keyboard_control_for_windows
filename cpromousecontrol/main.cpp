@@ -8,7 +8,9 @@
 #include <map>
 #include <cctype>
 #include <algorithm>
+
 #include "mousecontrol.h"
+#include "main.h"
 
 
 bool isClickChooseZhengtai = false;
@@ -20,34 +22,7 @@ std::atomic<bool> exitFlag(false);
 HWND hwnd_zt, hwnd_num, hwnd_location, hwnd_speed, hwnd_zt_text, hwnd_num_text, hwnd_concentrate, hwnd_normal_2, hwnd_time;
 HANDLE action_Thread = NULL;
 
-void separateAlphaNumeric(const std::string& str, std::string& alphaPart, std::string& leftNumber, std::string& rightNumber);
-
-
-#define ID_LISTBOX 1001
-
-#define ID_BUTTON_DELETE_ACTION 2001
-#define ID_BUTTON_ADD_ACTION 2002
-#define ID_BUTTON_MOVE_UP 2003
-#define ID_BUTTON_MOVE_DOWN 2004
-#define ID_BUTTON_ACTION 2100
-#define ID_BUTTON_STOP_ACTION 2101
-
-#define ID_CHOICE_1_1 3001
-#define ID_CHOICE_1_2 3002
-#define ID_CHOICE_1_3 3003
-#define ID_CHOICE_2_1 3011
-#define ID_CHOICE_2_2 3012
-#define ID_CHOICE_2_3 3013
-#define ID_CHOICE_2_4 3014
-
-#define ID_TEXT_TIME 4000
-#define ID_TEXT_NORMALDISTRIBUTION 4001
-#define ID_TEXT_NUM 4002
-#define ID_TEXT_LOCATION 4003
-#define ID_TEXT_STEP 4004
-#define ID_TEXT_NORMALDISTRIBUTION_2 4005
-#define ID_TEXT_CONCENTRATE 4006
-#define ID_TEXT_TIME_2 4007
+void separateAlphaNumeric(const std::string& str, std::string& alphaPart, std::vector<double>& num_vector);
 
 std::map<int, std::string> textBoxes = {
     {ID_TEXT_TIME, "time_t"},
@@ -60,25 +35,6 @@ std::map<int, std::string> textBoxes = {
     {ID_TEXT_TIME_2, "time_t"}
 };
 
-struct INPUT_2
-{
-    int c_index;
-    int kind;
-    int m_style;
-    int s_style;
-    int p_style;
-    POINT L;
-    double speed;
-    double time = 500;
-    double move_arg = 3;
-    double speed_arg = 5;
-};
-
-INPUT_2 inputs_2;
-std::vector<INPUT_2> inputses_2;
-
-
-// 存储默认值
 std::map<std::string, std::string> defaultValues = {
     {"time_t", "50"},
     {"normal_t", "1"},
@@ -93,6 +49,44 @@ std::map<std::string, std::string> defaultValues = {
 std::vector<std::string> varibles = {"","","","","","","",""};
 
 
+struct INPUT_1
+{
+    int kind = 0;
+    int style;
+    int num;
+    int times;
+    int style_arg = 1;
+    int num_arg = 1;
+};
+INPUT_1 inputs_1;
+
+struct INPUT_2
+{
+    int kind;
+    int m_style;
+    int s_style;
+    int p_style;
+    POINT L;
+    double speed;
+    double time;
+    double move_arg;
+    double speed_arg;
+};
+INPUT_2 inputs_2;
+
+struct InputUnion {
+    enum class Type { Input1, Input2 };
+    Type type;
+    union {
+        INPUT_1 input1;
+        INPUT_2 input2;
+    };
+
+    InputUnion(INPUT_1 i) : type(Type::Input1), input1(i) {}
+    InputUnion(INPUT_2 i) : type(Type::Input2), input2(i) {}
+};
+std::vector<InputUnion> inputs_all;
+
 std::string ReadFromCOMBOX(HWND hwnd, int ID) {
     int selectedIndex = SendMessage(GetDlgItem(hwnd, ID), CB_GETCURSEL, 0, 0);
     if (!isVariblesExist) {
@@ -103,7 +97,6 @@ std::string ReadFromCOMBOX(HWND hwnd, int ID) {
             std::string variable = textBox.second;
             GetWindowText(GetDlgItem(hwnd, textBox.first), buffer, bufferSize);
             if (std::wstring(buffer) == L"") {
-                //默认值
                 variable = defaultValues[variable];
             }
             else {
@@ -137,15 +130,15 @@ std::string ReadFromCOMBOX(HWND hwnd, int ID) {
         case ID_CHOICE_1_3:
             switch (selectedIndex) {
             case 0: return ("SINGLE" + varibles[0]);
-            case 1: return (varibles[2]+"MANY" + varibles[0]);
+            case 1: return ("MANY" + varibles[0]+"&"+ varibles[2]);
             case 2: return ("SINGLE" + varibles[0]);
             }
         case ID_CHOICE_2_1:
             switch (selectedIndex) {
-            case 0: return (varibles[3] + "ADDMOVE" + varibles[4]);
-            case 1: return (varibles[3] + "LOCMOVE" + varibles[4]);
-            case 2: return (varibles[7] + "RANDMOVE"+varibles[4]);
-            case 3: return (varibles[7] + "RANDMOVEC"+varibles[4]);
+            case 0: return ("ADDMOVE" + varibles[4] + "&" + varibles[3]);
+            case 1: return ("LOCMOVE" + varibles[4] + "&" + varibles[3]);
+            case 2: return ("RANDMOVE" + varibles[4] + "&" + varibles[7]);
+            case 3: return ("RANDMOVEC" + varibles[4] + "&" + varibles[7]);
             case 4: return "";
             }
         case ID_CHOICE_2_2:
@@ -213,7 +206,7 @@ void PushSettingIntoList(HWND hwnd) {
 }
 
 std::wstring FromListReadSetting(HWND hwnd) {
-    HWND hListBox = GetDlgItem(hwnd, ID_LISTBOX); // 获取 ListBox 控件的句柄
+    HWND hListBox = GetDlgItem(hwnd, ID_LISTBOX);
     int itemCount = SendMessage(hListBox, LB_GETCOUNT, 0, 0); // 获取 ListBox 中项目的数量
     std::wstring reads = L"";
 
@@ -230,21 +223,16 @@ std::wstring FromListReadSetting(HWND hwnd) {
     return reads;
 }
 
-std::vector<std::vector<int>> FromSettingGetCommand(std::vector<std::string> lines) {
+void FromSettingGetCommand(std::vector<std::string> lines) {
     std::vector<int> c_index;
     std::vector<std::vector<int>> c_indexs;
-    inputses_2.clear();
+    std::vector<double> num_part;
+    inputs_all.clear();
     for (std::string line : lines) {
-        if (exitFlag) { return c_indexs; }
+        if (exitFlag) { return; }
         std::cout << "PROCESSING" << std::endl;
         std::vector<std::string> commands;
         int control_num = 0;
-        int kind = 0;
-        int style;
-        int num;
-        int times;
-        int style_arg = 1;
-        int num_arg = 1;
 
         // 将字符串放入字符串流中
         std::stringstream ss(line);
@@ -257,113 +245,98 @@ std::vector<std::vector<int>> FromSettingGetCommand(std::vector<std::string> lin
         }
         if (commands[0] == "LC") {
             control_num = 1;
-            kind = 0;
+            inputs_1.kind = 0;
         }
         else if (commands[0] == "RC") {
             control_num = 1;
-            kind = 1;
+            inputs_1.kind = 1;
         }
         else if (commands[0] == "LP") {
             control_num = 1;
-            kind = 2;
+            inputs_1.kind = 2;
         }
         else if (commands[0] == "RP") {
             control_num = 1;
-            kind = 3;
+            inputs_1.kind = 3;
         }
         else if (commands[0] == "SPARE") {
             control_num = 1;
-            kind = 4;
+            inputs_1.kind = 4;
         }
         else {
             control_num = 2;
-            inputs_2.c_index = 2;
         }
-        //THERE IS NOT OK
 
         switch (control_num) {
         case 1: {
-            std::string alphaPart, leftNumericPart, rightNumericPart;
-            separateAlphaNumeric(commands[1], alphaPart, leftNumericPart, rightNumericPart);
+            std::string alphaPart;
+            separateAlphaNumeric(commands[1], alphaPart, num_part);
             if (alphaPart == "AVER") {
-                style = 0;
-                style_arg = std::stoi(rightNumericPart);
+                inputs_1.style = 0;
+                inputs_1.style_arg = num_part[0];
             }
             else if (alphaPart == "NORMAL") {
-                style = 1;
-                style_arg = std::stoi(rightNumericPart);
+                inputs_1.style = 1;
+                inputs_1.style_arg = num_part[0];
             }
             else if (alphaPart == "PRE") {
-                style = 2;
+                inputs_1.style = 2;
             }
-            separateAlphaNumeric(commands[2], alphaPart, leftNumericPart, rightNumericPart);
+            separateAlphaNumeric(commands[1], alphaPart, num_part);
             if (alphaPart == "SINGLE") {
-                num = 0;
-                times = std::stoi(rightNumericPart);
+                inputs_1.num = 0;
+                inputs_1.times = num_part[0];
             }
             else if (alphaPart == "MANY") {
-                num = 1;
-                num_arg = std::stoi(leftNumericPart);
-                times = std::stoi(rightNumericPart);
+                inputs_1.num = 1;
+                inputs_1.num_arg = num_part[0];
+                inputs_1.times = num_part[1];
             }
 
-            if (exitFlag) { return c_indexs; }
-            c_index = {1, kind,style,num,times,style_arg ,num_arg };
+            if (exitFlag) { return; }
         }
         break;
 
         case 2: {
-            std::string alphaPart, leftNumericPart, rightNumericPart;
-            separateAlphaNumeric(commands[0], alphaPart, leftNumericPart, rightNumericPart);
-            inputs_2.speed = std::stoi(rightNumericPart);
+            std::string alphaPart;
+            separateAlphaNumeric(commands[0], alphaPart, num_part);
+            inputs_2.speed = num_part.back();
             if (alphaPart == "ADDMOVE") {
-                std::stringstream ss(leftNumericPart);
-                std::vector<std::string> tokens;
-                std::string token;
-                while (std::getline(ss, token, ';')) {
-                    tokens.push_back(token);
-                }
-                inputs_2.L.x = std::stoi(tokens[0]);
-                inputs_2.L.y = std::stoi(tokens[1]);
+                inputs_2.L.x = num_part[0];
+                inputs_2.L.y = num_part[1];
                 inputs_2.kind = 0;
             }
             else if (alphaPart == "LOCMOVE") {
                 inputs_2.kind = 1;
-                std::stringstream ss(leftNumericPart);
-                std::vector<std::string> tokens;
-                std::string token;
-                while (std::getline(ss, token, ';')) {
-                    tokens.push_back(token);
-                }
-                inputs_2.L.x = std::stoi(tokens[0]);
-                inputs_2.L.y = std::stoi(tokens[1]);
+                inputs_2.L.x = num_part[0];
+                inputs_2.L.y = num_part[1];
             }
             else if (alphaPart == "RANDMOVE") {
                 inputs_2.kind = 2;
-                inputs_2.time = std::stoi(leftNumericPart);
+                inputs_2.time = num_part[0];
             }
             else if (alphaPart == "RANDMOVEC") {
                 inputs_2.kind = 3;
-                inputs_2.time = std::stoi(leftNumericPart);
+                inputs_2.time = num_part[0];
             }
-            separateAlphaNumeric(commands[1], alphaPart, leftNumericPart, rightNumericPart);
+            separateAlphaNumeric(commands[1], alphaPart, num_part);
             if (alphaPart == "NOERR") {
                 inputs_2.m_style = 0;
             }
             else if (alphaPart == "RANDW") {
                 inputs_2.m_style = 1;
-                inputs_2.move_arg = std::stoi(rightNumericPart);
+                inputs_2.move_arg = num_part[0];
                 
             }
-            separateAlphaNumeric(commands[2], alphaPart, leftNumericPart, rightNumericPart);
+            separateAlphaNumeric(commands[2], alphaPart, num_part);
             if (alphaPart == "SPPEDNOERR") {
                 inputs_2.s_style = 0;
             }
             else if (alphaPart == "SPPEDNORMAL") {
                 inputs_2.s_style = 1;
-                inputs_2.speed_arg = std::stoi(rightNumericPart);
+                inputs_2.speed_arg = num_part[0];
             }
-            separateAlphaNumeric(commands[3], alphaPart, leftNumericPart, rightNumericPart);
+            separateAlphaNumeric(commands[3], alphaPart, num_part);
             if (alphaPart == "NP") {
                 inputs_2.p_style = 0;
             }
@@ -375,37 +348,29 @@ std::vector<std::vector<int>> FromSettingGetCommand(std::vector<std::string> lin
             }
             
 
-            if (exitFlag) { return c_indexs; }
+            if (exitFlag) { return; }
         }
         break;
 
         }
 
         if (control_num == 1) {
-            c_index = { 1, kind,style,num,times,style_arg ,num_arg };
+            inputs_all.push_back(inputs_1);
         }
         else {
-            c_index = { 2,0,0,0,0,0,0 };
-            inputses_2.push_back(inputs_2);
+            inputs_all.push_back(inputs_2);
         }
-        c_indexs.push_back(c_index);
         
     }
-    return c_indexs;
+    return;
 }
 
-void separateAlphaNumeric(const std::string& str, std::string& alphaPart, std::string& leftNumber, std::string& rightNumber) {
+void separateAlphaNumeric(const std::string& str, std::string& alphaPart, std::vector<double>& num_vector) {
     alphaPart.clear();
-    leftNumber.clear();
-    rightNumber.clear();
+    num_vector.clear();
+    std::string num_string;
 
     size_t i = 0;
-
-    // 处理左侧数字部分
-    while ((i < str.length() && std::isdigit(str[i]))||(str[i]==';') || (str[i] == '-')) {
-        leftNumber.push_back(str[i]);
-        ++i;
-    }
 
     // 处理字母部分
     while (i < str.length() && std::isalpha(str[i]) && str[i] != '-') {
@@ -414,24 +379,34 @@ void separateAlphaNumeric(const std::string& str, std::string& alphaPart, std::s
     }
 
     // 处理右侧数字部分
-    while ((i < str.length() && std::isdigit(str[i])) || (str[i] == '-')) {
-        rightNumber.push_back(str[i]);
-        ++i;
-    }
-}
-
-void Actions(std::vector<std::vector<int>> commands) {
-    int sec = 0;
-    for (std::vector<int> command : commands) {
-        if (command[0] == 1) {
-            MouseControl_1(command[1], command[2], command[3], command[4], command[5], command[6]);
+    while (i < str.length()) {
+        if (str[i] == ';' || str[i] == '_' && num_string!= "") {
+            num_vector.push_back(std::stoi(num_string));
+            num_string.clear();
         }
         else {
-            INPUT_2 inputs = inputses_2[sec];
-            MouseControl_2(inputs.kind, inputs.m_style, inputs.s_style, inputs.p_style, inputs.L, inputs.speed, inputs.time, inputs.move_arg, inputs.speed_arg);
-            sec++;
+            num_string.push_back(str[i]);
+            ++i;
         }
-    }   
+    }
+    if (num_string != "") {
+        num_vector.push_back(std::stoi(num_string));
+    }
+
+}
+
+void Actions() {
+
+    for (const auto& inputs_u : inputs_all) {
+        if (inputs_u.type == InputUnion::Type::Input1) {
+            INPUT_1 inputs = inputs_u.input1;
+            MouseControl_1(inputs.kind, inputs.style, inputs.num, inputs.times, inputs.style_arg, inputs.num_arg);
+        }
+        else if (inputs_u.type == InputUnion::Type::Input2) {
+            INPUT_2 inputs = inputs_u.input2;
+            MouseControl_2(inputs.kind, inputs.m_style, inputs.s_style, inputs.p_style, inputs.L, inputs.speed, inputs.time, inputs.move_arg, inputs.speed_arg);
+        }
+    }
     return;
 }
 
@@ -449,10 +424,10 @@ void ActionStart(HWND hwnd) {
     while (std::getline(ss, line, ',')) {
         lines.push_back(line);
     }
-    std::vector<std::vector<int>> commands = FromSettingGetCommand(lines);
+    FromSettingGetCommand(lines);
     while (!exitFlag) {
-        std::cout << "A NEw LOOP COME" << std::endl;
-        Actions(commands);
+        std::cout << "A NEW LOOP COME" << std::endl;
+        Actions();
     }
     return;
 }
@@ -469,8 +444,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
     case WM_CREATE: {
         HWND hListBox = CreateWindowEx(0, L"LISTBOX", L"", WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | LBS_NOTIFY,
-            10, 10, 330, 200, hwnd, (HMENU)ID_LISTBOX, NULL, NULL);
+            10, 76, 330, 134, hwnd, (HMENU)ID_LISTBOX, NULL, NULL);
         SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)L"#删#最好有<空闲>时间，避免程序循环关不掉");
+        HWND hListBox_i = CreateWindowEx(0, L"LISTBOX", L"", WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | LBS_NOTIFY,
+            10, 10, 330, 66, hwnd, (HMENU)ID_LISTBOX_INIT, NULL, NULL);
+        SendMessage(hListBox_i, LB_ADDSTRING, 0, (LPARAM)L"#删#这里只执行一次（初始）");
 
         CreateWindowW(L"BUTTON", L"删除", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON, 10, 210, 100, 30, hwnd, (HMENU)ID_BUTTON_DELETE_ACTION, NULL, NULL);
         CreateWindowW(L"BUTTON", L"添加", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON, 110, 210, 100, 30, hwnd, (HMENU)ID_BUTTON_ADD_ACTION, NULL, NULL);
@@ -522,7 +500,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
 
         CreateWindowW(L"EDIT", L"50", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 650, 30, 100, 20, hwnd, (HMENU)ID_TEXT_TIME, NULL, NULL);
-        
+
         CreateWindowW(L"STATIC", L"ms", WS_CHILD | WS_VISIBLE, 750, 30, 50, 20, hwnd, NULL, NULL, NULL);
         CreateWindowW(L"STATIC", L"鼠标操作", WS_CHILD | WS_VISIBLE, 350, 5, 100, 20, hwnd, NULL, NULL, NULL);
         CreateWindowW(L"STATIC", L"鼠标移动操作", WS_CHILD | WS_VISIBLE, 350, 75, 100, 20, hwnd, NULL, NULL, NULL);
@@ -725,53 +703,102 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             break;
             
         case ID_LISTBOX:
+            SendMessage(GetDlgItem(hwnd, ID_LISTBOX_INIT), LB_SETCURSEL, -1, 0);
             if (wmEvent == LBN_SELCHANGE) {
                 int selectedIndex = SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_GETCURSEL, 0, 0);
                 if (selectedIndex != LB_ERR) {
-                    std::cout << "Focus on a action" << std::endl;
+                    std::cout << "Focus on a action #normal" << std::endl;
+                    SetFocus(hwnd);
+                }
+            }
+            break;
+
+        case ID_LISTBOX_INIT:
+            SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_SETCURSEL, -1, 0);
+            if (wmEvent == LBN_SELCHANGE) {
+                int selectedIndex = SendMessage(GetDlgItem(hwnd, ID_LISTBOX_INIT), LB_GETCURSEL, 0, 0);
+                if (selectedIndex != LB_ERR) {
+                    std::cout << "Focus on a action #init" << std::endl;
                     SetFocus(hwnd);
                 }
             }
             break;
             
         case ID_BUTTON_DELETE_ACTION: {
+            int isInit = 0;
             int deleteIndex = SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_GETCURSEL, 0, 0);
+            if (deleteIndex == -1) {
+                deleteIndex = SendMessage(GetDlgItem(hwnd, ID_LISTBOX_INIT), LB_GETCURSEL, 0, 0);
+                isInit = 1;
+            }
             if (deleteIndex != LB_ERR) {
-                SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_DELETESTRING, deleteIndex, 0);
+                SendMessage(GetDlgItem(hwnd, ID_LISTBOX+ isInit), LB_DELETESTRING, deleteIndex, 0);
                 SetFocus(hwnd);
             }
         }
             break;
 
         case ID_BUTTON_MOVE_UP: {
+            int isInit = 0;
             int selectedIndex = SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_GETCURSEL, 0, 0);
+            if (selectedIndex == -1) {
+                selectedIndex = SendMessage(GetDlgItem(hwnd, ID_LISTBOX_INIT), LB_GETCURSEL, 0, 0);
+                isInit = 1;
+            }
             if (selectedIndex != LB_ERR && selectedIndex > 0) {
-                TCHAR buffer[256];
+                TCHAR buffer[64];
                 // 获取选定项的文本
-                SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_GETTEXT, selectedIndex, (LPARAM)buffer);
+                SendMessage(GetDlgItem(hwnd, ID_LISTBOX + isInit), LB_GETTEXT, selectedIndex, (LPARAM)buffer);
                 // 删除选定项
-                SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_DELETESTRING, selectedIndex, 0);
+                SendMessage(GetDlgItem(hwnd, ID_LISTBOX + isInit), LB_DELETESTRING, selectedIndex, 0);
                 // 将文本插入到上一个位置
-                SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_INSERTSTRING, selectedIndex - 1, (LPARAM)buffer);
+                SendMessage(GetDlgItem(hwnd, ID_LISTBOX + isInit), LB_INSERTSTRING, selectedIndex - 1, (LPARAM)buffer);
                 // 选中上移后的项
-                SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_SETCURSEL, selectedIndex - 1, 0);
+                SendMessage(GetDlgItem(hwnd, ID_LISTBOX + isInit), LB_SETCURSEL, selectedIndex - 1, 0);
+            }
+            else if (selectedIndex == 0 && isInit == 0) {
+                TCHAR buffer[64];
+                // 获取选定项的文本
+                SendMessage(GetDlgItem(hwnd, ID_LISTBOX + isInit), LB_GETTEXT, selectedIndex, (LPARAM)buffer);
+                // 删除选定项
+                SendMessage(GetDlgItem(hwnd, ID_LISTBOX + isInit), LB_DELETESTRING, selectedIndex, 0);
+                // 将文本插入到上一个位置
+                SendMessage(GetDlgItem(hwnd, ID_LISTBOX + 1), LB_ADDSTRING, 0, (LPARAM)buffer);
+                // 选中上移后的项
+                SendMessage(GetDlgItem(hwnd, ID_LISTBOX + 1), LB_SETCURSEL, SendMessage(GetDlgItem(hwnd, ID_LISTBOX + 1), LB_GETCOUNT, 0, 0) - 1, 0);
             }
             SetFocus(hwnd);
         }
             break;
 
         case ID_BUTTON_MOVE_DOWN: {
+            int isInit = 0;
             int selectedIndex = SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_GETCURSEL, 0, 0);
-            if (selectedIndex != LB_ERR && selectedIndex < SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_GETCOUNT, 0, 0)-1) {
-                TCHAR buffer[256];
+            if (selectedIndex == -1) {
+                selectedIndex = SendMessage(GetDlgItem(hwnd, ID_LISTBOX_INIT), LB_GETCURSEL, 0, 0);
+                isInit = 1;
+            }
+            if (selectedIndex != LB_ERR && selectedIndex < SendMessage(GetDlgItem(hwnd, ID_LISTBOX + isInit), LB_GETCOUNT, 0, 0)-1) {
+                TCHAR buffer[64];
                 // 获取选定项的文本
-                SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_GETTEXT, selectedIndex, (LPARAM)buffer);
+                SendMessage(GetDlgItem(hwnd, ID_LISTBOX + isInit), LB_GETTEXT, selectedIndex, (LPARAM)buffer);
                 // 删除选定项
-                SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_DELETESTRING, selectedIndex, 0);
+                SendMessage(GetDlgItem(hwnd, ID_LISTBOX + isInit), LB_DELETESTRING, selectedIndex, 0);
                 // 将文本插入到下一个位置
-                SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_INSERTSTRING, selectedIndex + 1, (LPARAM)buffer);
+                SendMessage(GetDlgItem(hwnd, ID_LISTBOX + isInit), LB_INSERTSTRING, selectedIndex + 1, (LPARAM)buffer);
                 // 选中上移后的项
-                SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_SETCURSEL, selectedIndex + 1, 0);
+                SendMessage(GetDlgItem(hwnd, ID_LISTBOX + isInit), LB_SETCURSEL, selectedIndex + 1, 0);
+            }
+            else if (isInit == 1 && selectedIndex == SendMessage(GetDlgItem(hwnd, ID_LISTBOX + isInit), LB_GETCOUNT, 0, 0) - 1) {
+                TCHAR buffer[64];
+                // 获取选定项的文本
+                SendMessage(GetDlgItem(hwnd, ID_LISTBOX + isInit), LB_GETTEXT, selectedIndex, (LPARAM)buffer);
+                // 删除选定项
+                SendMessage(GetDlgItem(hwnd, ID_LISTBOX + isInit), LB_DELETESTRING, selectedIndex, 0);
+                // 将文本插入到下一个位置
+                SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_INSERTSTRING, 0, (LPARAM)buffer);
+                // 选中上移后的项
+                SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_SETCURSEL, 0, 0);
             }
             SetFocus(hwnd);
         }
@@ -794,7 +821,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 }
             }
             else {
-                std::cout << "线程已经在运行" << std::endl;
+                std::cout << "线程,启动。" << std::endl;
             }
         }
             SetFocus(hwnd);
@@ -836,7 +863,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         int width = rect.right - rect.left;
         int height = rect.bottom - rect.top;
 
-        // 创建内存设备上下文
         HDC memDC = CreateCompatibleDC(hdc);
         HBITMAP memBitmap = CreateCompatibleBitmap(hdc, width, height);
         HBITMAP hOldBitmap = (HBITMAP)SelectObject(memDC, memBitmap);
@@ -899,12 +925,18 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             break;
 
         case VK_DELETE: {
+            int isInit = 0;
             int deleteIndex = SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_GETCURSEL, 0, 0);
-            if (deleteIndex != LB_ERR) {
-                SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_DELETESTRING, deleteIndex, 0);
+            if (deleteIndex == -1) {
+                deleteIndex = SendMessage(GetDlgItem(hwnd, ID_LISTBOX_INIT), LB_GETCURSEL, 0, 0);
+                isInit = 1;
             }
-            break;
+            if (deleteIndex != LB_ERR) {
+                SendMessage(GetDlgItem(hwnd, ID_LISTBOX + isInit), LB_DELETESTRING, deleteIndex, 0);
+                SetFocus(hwnd);
+            }
         }
+        break;
 
         case VK_ESCAPE:
             PostQuitMessage(0);
@@ -944,14 +976,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    // 注册窗口类
     WNDCLASS wc = { 0 };
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = L"mcv0.0";
     RegisterClass(&wc);
 
-    // 创建窗口
     int windowWidth = 800;
     int windowHeight = 400;
     int posX = (GetSystemMetrics(SM_CXSCREEN) - windowWidth) / 2;
@@ -965,8 +995,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
     ShowWindow(hwnd, nCmdShow);
 
-
-    // 主消息循环
     MSG msg = { 0 };
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);

@@ -144,6 +144,7 @@
     <ClCompile Include="MouseControl.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="main.h" />
     <ClInclude Include="mathbase.h" />
     <ClInclude Include="mousecontrol.h" />
   </ItemGroup>
