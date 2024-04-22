@@ -107,8 +107,8 @@ void Move(POINT I, POINT L, double speed,
 			if (!style_0) {
 				input.type = INPUT_MOUSE;
 				input.mi.dwFlags = MOUSEEVENTF_MOVE;
-				input.mi.dx = (GO.x - NOW.x) * screenWidth / 65535.0;
-				input.mi.dy = (GO.y - NOW.y) * screenHeight / 65535.0;
+				input.mi.dx = round((GO.x - NOW.x) * screenWidth / 65535.0);
+				input.mi.dy = round((GO.y - NOW.y) * screenHeight / 65535.0);
 				input.mi.time = 0;
 				int randt = NormalDistribution(20, 5);
 				auto end = std::chrono::high_resolution_clock::now();
@@ -158,8 +158,8 @@ void Move(POINT I, POINT L, double speed,
 			}
 			input.type = INPUT_MOUSE;
 			input.mi.dwFlags = MOUSEEVENTF_MOVE;
-			input.mi.dx = (GO.x - NOW.x) * screenWidth / 65535.0;
-			input.mi.dy = (GO.y - NOW.y) * screenHeight / 65535.0;
+			input.mi.dx = round((GO.x - NOW.x) * screenWidth / 65535.0);
+			input.mi.dy = round((GO.y - NOW.y) * screenHeight / 65535.0);
 			input.mi.time = 0;
 			int randt = NormalDistribution(20, 5);
 			auto end = std::chrono::high_resolution_clock::now();
@@ -195,8 +195,8 @@ void Move(POINT I, POINT L, double speed,
 
 			input.type = INPUT_MOUSE;
 			input.mi.dwFlags = MOUSEEVENTF_MOVE;
-			input.mi.dx = (GO.x - NOW.x) * screenWidth / 65535.0;
-			input.mi.dy = (GO.y - NOW.y) * screenHeight / 65535.0;
+			input.mi.dx = round((GO.x - NOW.x) * screenWidth / 65535.0);
+			input.mi.dy = round((GO.y - NOW.y) * screenHeight / 65535.0);
 			input.mi.time = 0;
 			SendInput(1, &input, sizeof(INPUT));
 			NOW = GO;

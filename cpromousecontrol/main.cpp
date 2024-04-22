@@ -298,26 +298,28 @@ void FromSettingGetCommand(std::vector<std::string> lines) {
         break;
 
         case 2: {
+            std::cout << "nor 1" << std::endl;
             std::string alphaPart;
             separateAlphaNumeric(commands[0], alphaPart, num_part);
-            inputs_2.speed = num_part.back();
+            std::cout << "nor 1" << std::endl;
+            inputs_2.speed = num_part[0];
             if (alphaPart == "ADDMOVE") {
-                inputs_2.L.x = num_part[0];
-                inputs_2.L.y = num_part[1];
+                inputs_2.L.x = num_part[1];
+                inputs_2.L.y = num_part[2];
                 inputs_2.kind = 0;
             }
             else if (alphaPart == "LOCMOVE") {
-                inputs_2.kind = 1;
-                inputs_2.L.x = num_part[0];
-                inputs_2.L.y = num_part[1];
+                inputs_2.kind = 1;                
+                inputs_2.L.x = num_part[1];
+                inputs_2.L.y = num_part[2];
             }
             else if (alphaPart == "RANDMOVE") {
                 inputs_2.kind = 2;
-                inputs_2.time = num_part[0];
+                inputs_2.time = num_part[1];
             }
             else if (alphaPart == "RANDMOVEC") {
                 inputs_2.kind = 3;
-                inputs_2.time = num_part[0];
+                inputs_2.time = num_part[1];
             }
             separateAlphaNumeric(commands[1], alphaPart, num_part);
             if (alphaPart == "NOERR") {
@@ -380,19 +382,19 @@ void separateAlphaNumeric(const std::string& str, std::string& alphaPart, std::v
 
     // 处理右侧数字部分
     while (i < str.length()) {
-        if (str[i] == ';' || str[i] == '_' && num_string!= "") {
+        if (str[i] == ';' || str[i] == '&' && num_string!= "") {
             num_vector.push_back(std::stoi(num_string));
-            num_string.clear();
+            num_string = "";
+            ++i;
         }
         else {
-            num_string.push_back(str[i]);
+            num_string += str[i];
             ++i;
         }
     }
     if (num_string != "") {
         num_vector.push_back(std::stoi(num_string));
     }
-
 }
 
 void Actions() {
@@ -418,13 +420,14 @@ void ActionStart(HWND hwnd) {
     std::stringstream ss(reads);
     std::vector<std::string> lines;
     std::string line;
-    Sleep(3000);
 
     isSpecialPointShouldReget = true;
     while (std::getline(ss, line, ',')) {
         lines.push_back(line);
     }
     FromSettingGetCommand(lines);
+
+    Sleep(3000);
     while (!exitFlag) {
         std::cout << "A NEW LOOP COME" << std::endl;
         Actions();
