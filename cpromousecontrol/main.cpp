@@ -8,6 +8,7 @@
 #include <map>
 #include <cctype>
 #include <algorithm>
+#include <CommCtrl.h>
 
 #include "mousecontrol.h"
 #include "main.h"
@@ -17,11 +18,14 @@ bool isClickChooseZhengtai = false;
 bool isClickChoosePlentyTime  = false;
 bool isThreadRunning = false;
 bool isVariblesExist = false;
+bool isInitListEmpty = true;
+bool isCirculateListEmpty = true;
 extern bool isSpecialPointShouldReget;
 std::atomic<bool> exitFlag(false);
 HWND hwnd_zt, hwnd_num, hwnd_location, hwnd_speed, hwnd_zt_text, hwnd_num_text, hwnd_concentrate, hwnd_normal_2, hwnd_time,
 hwnd_loc_text, hwnd_speed_text, hwnd_time_text, hwnd_concentrate_text, hwnd_normal_2_text;
 HWND hwnd_;
+HWND hwndProgress;
 HANDLE action_Thread = NULL;
 
 void separateAlphaNumeric(const std::string& str, std::string& alphaPart, std::vector<double>& num_vector);
@@ -53,7 +57,7 @@ std::vector<std::string> varibles = {"","","","","","","",""};
 
 struct INPUT_1
 {
-    int kind = 0;
+    int kind = -1;
     int style;
     int num;
     int times;
@@ -64,7 +68,7 @@ INPUT_1 inputs_1;
 
 struct INPUT_2
 {
-    int kind;
+    int kind = -1;
     int m_style;
     int s_style;
     int p_style;
@@ -237,13 +241,11 @@ void FromSettingGetCommand(std::vector<std::string> lines) {
         std::vector<std::string> commands;
         int control_num = 0;
 
-        // 将字符串放入字符串流中
         std::stringstream ss(line);
 
         // 使用std::getline分割字符串
         std::string command;
         while (std::getline(ss, command, '#')) {
-            // 将分割后的子串存储到vector中
             commands.push_back(command);
         }
         if (commands[0] == "LC") {
@@ -303,7 +305,7 @@ void FromSettingGetCommand(std::vector<std::string> lines) {
         case 2: {
             std::string alphaPart;
             separateAlphaNumeric(commands[0], alphaPart, num_part);
-            inputs_2.speed = num_part[0];
+            if (num_part.size() > 1) { inputs_2.speed = num_part[0]; }else {break;}
             if (alphaPart == "ADDMOVE") {
                 inputs_2.L.x = num_part[1];
                 inputs_2.L.y = num_part[2];
@@ -358,9 +360,11 @@ void FromSettingGetCommand(std::vector<std::string> lines) {
         }
 
         if (control_num == 1) {
+            if (inputs_1.kind == -1) { break; }
             inputs_all.push_back(inputs_1);
         }
         else {
+            if (inputs_2.kind == -1) { break; }
             inputs_all.push_back(inputs_2);
         }
         
@@ -384,7 +388,12 @@ void separateAlphaNumeric(const std::string& str, std::string& alphaPart, std::v
     // 处理右侧数字部分
     while (i < str.length()) {
         if ((str[i] == ';' || str[i] == '&' )&& num_string!= "") {
-            num_vector.push_back(std::stoi(num_string));
+            try {
+                num_vector.push_back(std::stoi(num_string));
+            }
+            catch(std::exception& e){
+                std::cout << "error input" << std::endl;
+            }
             num_string = "";
             ++i;
         }
@@ -399,6 +408,9 @@ void separateAlphaNumeric(const std::string& str, std::string& alphaPart, std::v
 }
 
 void Actions() {
+    int command_length = inputs_all.size();
+    double command_i = 0.0;
+    SendMessage(hwndProgress, PBM_SETPOS, 1, 0);
 
     for (const auto& inputs_u : inputs_all) {
         if (inputs_u.type == InputUnion::Type::Input1) {
@@ -409,12 +421,32 @@ void Actions() {
             INPUT_2 inputs = inputs_u.input2;
             MouseControl_2(inputs.kind, inputs.m_style, inputs.s_style, inputs.p_style, inputs.L, inputs.speed, inputs.time, inputs.move_arg, inputs.speed_arg);
         }
+        command_i++;
+        SendMessage(hwndProgress, PBM_SETPOS, 100.0* command_i / command_length, 0);
     }
+    return;
+}
+
+
+void ActionStop() {
+    exitFlag = true;
+    DestroyWindow(hwndProgress);
+    hwndProgress = NULL;
     return;
 }
 
 void ActionStart(HWND hwnd) {
     HWND hListBox = GetDlgItem(hwnd, ID_LISTBOX+1);
+    hwndProgress = CreateWindowEx(0, PROGRESS_CLASS, NULL, WS_CHILD | WS_VISIBLE | WS_BORDER, 10, 330, 200, 20, hwnd, NULL, NULL, NULL);
+    if (hwndProgress == NULL) {
+        MessageBox(hwnd, L"Failed to create progress bar.", L"Error", MB_OK | MB_ICONERROR);
+    }
+    else {
+        SendMessage(hwndProgress, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
+    }
+
+    isInitListEmpty = true;
+    isCirculateListEmpty = true;
     std::wstring wreads;
     wreads = FromListReadSetting(hListBox);
     std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
@@ -428,8 +460,12 @@ void ActionStart(HWND hwnd) {
         lines.push_back(line);
     }
     FromSettingGetCommand(lines);
-    Actions();//！下面的步骤要一定时间，导致出现时间空隙，待解决！
 
+    if (inputs_all.size() > 0) {
+        isInitListEmpty = false;
+        Actions();//！下面的步骤要一定时间，导致出现时间空隙，待解决！
+    }
+    
     hListBox = GetDlgItem(hwnd, ID_LISTBOX);
     wreads = FromListReadSetting(hListBox);
     reads = converter.to_bytes(wreads);
@@ -443,6 +479,19 @@ void ActionStart(HWND hwnd) {
         lines.push_back(line);
     }
     FromSettingGetCommand(lines);
+
+    if (inputs_all.size() > 0) {
+        isCirculateListEmpty = false;
+    }
+    if (isCirculateListEmpty && isInitListEmpty) {
+        MessageBox(hwnd, L"请输入有效指令。", L"警告", MB_OK | MB_ICONWARNING);
+        MSG msg = { 0 };
+        while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+        while (!exitFlag) { Sleep(50); }
+    }
     while (!exitFlag) {
         std::cout << "A NEW LOOP COME" << std::endl;
         Actions();
@@ -450,21 +499,19 @@ void ActionStart(HWND hwnd) {
     return;
 }
 
-void ActionStop() {
-    exitFlag = true;
-    return;
-}
 
 LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
-    if (nCode >= 0 && wParam == WM_KEYDOWN)
-    {
+    if (nCode >= 0 && wParam == WM_KEYDOWN){
         KBDLLHOOKSTRUCT* pKbd = (KBDLLHOOKSTRUCT*)lParam;
         int keyCode = pKbd->vkCode;
 
         switch (keyCode) {
-        case 'K':
-        case 'k': {
+        case 'K':{
+            HWND hERROR = FindWindow(NULL, L"警告");
+            if (hERROR != NULL) {
+                break;
+            }
             std::cout << "试图停止线程" << std::endl;
             if (isThreadRunning) {
                 ActionStop();
@@ -480,10 +527,10 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
             else {
                 std::cout << "线程未在运行" << std::endl;
             }
-            return 1;
+            break;
         }
-        case 'O':
-        case 'o': {
+
+        case 'O':{
             std::cout << "试图开启线程" << std::endl;
             if (!isThreadRunning) {
                 exitFlag = false;
@@ -497,8 +544,22 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
             else {
                 std::cout << "线程已经在运行" << std::endl;
             }
-            return 1;
+            break;
         }
+
+        default:
+            break;
+            /*
+            std::string key;
+            auto it = keyMap.find(keyCode);
+            if (it != keyMap.end()) {
+                key = it->second;
+            }
+            else {
+                std::cout << "?ID" << keyCode << std::endl;
+            }
+            */
+
         }
     }
 
@@ -508,12 +569,15 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 void InstallHook()
 {
     g_hHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, NULL, 0);
+    if (g_hHook == NULL) {
+        std::cout << "hook is here??" << std::endl;
+    }
+
 }
 
 void UninstallHook()
 {
-    if (g_hHook != NULL)
-    {
+    if (g_hHook != NULL){
         UnhookWindowsHookEx(g_hHook);
         g_hHook = NULL;
     }
@@ -1088,8 +1152,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 }
 
 int main() {
-    //HWND consoleWindow = GetConsoleWindow();
-    //ShowWindow(consoleWindow, SW_HIDE);
+    HWND consoleWindow = GetConsoleWindow();
+    ShowWindow(consoleWindow, SW_HIDE);
 
     LPSTR lpCmdLine = GetCommandLineA();
 

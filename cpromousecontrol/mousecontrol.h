@@ -17,3 +17,5 @@ void MouseControl_2(int kind,	//{ L"ÔöÁ¿ÒÆ¶¯", L"×ø±êÒÆ¶¯", L"Ëæ»úÒÆ¶¯", L"Ëæ»úÒ
 	double move_arg = 3,		//ÏòĞÄËæ»úÓÎ×ßµÄconcentrate
 	double speed_arg = 5		//ËÙ¶ÈÕıÌ«
 );
+
+void TimerCanDetect(double times);
