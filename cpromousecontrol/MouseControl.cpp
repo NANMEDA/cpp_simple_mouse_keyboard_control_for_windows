@@ -9,8 +9,8 @@ double screenHeight = GetSystemMetrics(SM_CYSCREEN);
 POINT SPECIAL_FOR_RANDOMGOCENTER_AS_NO_SPACE;
 bool isSpecialPointShouldReget = true;
 
-void TimerCanDetect(int times) {
-	double t=0;
+void TimerCanDetect(double times) {
+	double t=0.0;
 	auto start = std::chrono::high_resolution_clock::now();
 	while (t < times) {
 		auto end = std::chrono::high_resolution_clock::now();
@@ -267,12 +267,12 @@ void MouseControl_2(int kind,	//{ L"ÔöÁ¿ÒÆ¶¯", L"×ø±êÒÆ¶¯", L"Ëæ»úÒÆ¶¯", L"Ëæ»úÒ
 void MouseControl_1(int kind,	//{ L"×ó¼üµã»÷", L"ÓÒ¼üµã»÷", L"×ó¼ü°´×¡", L"ÓÒ¼ü°´×¡", L"¿ÕÏÐ", L"<¿Õ>" } 
 	int style,					//{ L"Æ½¾ù", L"ÕýÌ«", L"¾«×¼", L"<¿Õ/¾«×¼>" }
 	int num,					//{ L"µ¥´Î/±¶", L"¶à´Î/±¶", L"<¿Õ/µ¥>" }
-	int times,
+	double times,
 	int style_arg = 1,
 	int num_arg = 1) {
 	INPUT input;
 	input.type = INPUT_MOUSE;
-	int randomtime;
+	double randomtime;
 	for (int i = 0; i < num_arg; i++) {
 		if (exitFlag) { return; }
 		switch (style) {

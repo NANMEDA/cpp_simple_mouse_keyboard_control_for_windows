@@ -282,7 +282,7 @@ void FromSettingGetCommand(std::vector<std::string> lines) {
             else if (alphaPart == "PRE") {
                 inputs_1.style = 2;
             }
-            separateAlphaNumeric(commands[1], alphaPart, num_part);
+            separateAlphaNumeric(commands[2], alphaPart, num_part);
             if (alphaPart == "SINGLE") {
                 inputs_1.num = 0;
                 inputs_1.times = num_part[0];
@@ -452,7 +452,7 @@ void ActionStop() {
     return;
 }
 
-// 窗口过程函数
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     bool isFirstComboEmpty = false;
     switch (uMsg) {
@@ -652,7 +652,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     }
                     break;
                 case 2:
-                    //isShowSpeed = true;
                     if (hwnd_speed == NULL) {
                         hwnd_speed = CreateWindowW(L"EDIT", L"10", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 350, 130, 50, 20, hwnd, (HMENU)ID_TEXT_STEP, NULL, NULL);
                         hwnd_speed_text = CreateWindowW(L"STATIC", L"速度", WS_CHILD | WS_VISIBLE, 350, 150, 50, 20, hwnd, NULL, NULL, NULL);
@@ -1058,8 +1057,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 }
 
 int main() {
-    HWND consoleWindow = GetConsoleWindow();
-    ShowWindow(consoleWindow, SW_HIDE);
+    //HWND consoleWindow = GetConsoleWindow();
+    //ShowWindow(consoleWindow, SW_HIDE);
 
     LPSTR lpCmdLine = GetCommandLineA();
    

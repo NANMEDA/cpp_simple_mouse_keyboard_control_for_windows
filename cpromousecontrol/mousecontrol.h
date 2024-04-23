@@ -3,7 +3,7 @@
 void MouseControl_1(int kind,	//{ L"左键点击", L"右键点击", L"左键按住", L"右键按住", L"空闲", L"<空>" } 
 	int style,					//{ L"平均", L"正太", L"精准", L"<空/精准>" }
 	int num,					//{ L"单次/倍", L"多次/倍", L"<空/单>" }
-	int times,
+	double times,
 	int style_arg = 1,
 	int num_arg = 1);
 
