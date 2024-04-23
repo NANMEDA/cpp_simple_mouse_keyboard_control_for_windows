@@ -21,6 +21,7 @@ extern bool isSpecialPointShouldReget;
 std::atomic<bool> exitFlag(false);
 HWND hwnd_zt, hwnd_num, hwnd_location, hwnd_speed, hwnd_zt_text, hwnd_num_text, hwnd_concentrate, hwnd_normal_2, hwnd_time,
 hwnd_loc_text, hwnd_speed_text, hwnd_time_text, hwnd_concentrate_text, hwnd_normal_2_text;
+HWND hwnd_;
 HANDLE action_Thread = NULL;
 
 void separateAlphaNumeric(const std::string& str, std::string& alphaPart, std::vector<double>& num_vector);
@@ -87,6 +88,8 @@ struct InputUnion {
     InputUnion(INPUT_2 i) : type(Type::Input2), input2(i) {}
 };
 std::vector<InputUnion> inputs_all;
+
+HHOOK g_hHook = NULL;
 
 std::string ReadFromCOMBOX(HWND hwnd, int ID) {
     int selectedIndex = SendMessage(GetDlgItem(hwnd, ID), CB_GETCURSEL, 0, 0);
@@ -452,6 +455,69 @@ void ActionStop() {
     return;
 }
 
+LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+    if (nCode >= 0 && wParam == WM_KEYDOWN)
+    {
+        KBDLLHOOKSTRUCT* pKbd = (KBDLLHOOKSTRUCT*)lParam;
+        int keyCode = pKbd->vkCode;
+
+        switch (keyCode) {
+        case 'K':
+        case 'k': {
+            std::cout << "试图停止线程" << std::endl;
+            if (isThreadRunning) {
+                ActionStop();
+                if (action_Thread != NULL) {
+                    WaitForSingleObject(action_Thread, INFINITE);
+                    CloseHandle(action_Thread);
+                    std::cout << "停止线程" << std::endl;
+                    action_Thread = NULL;
+                }
+                isThreadRunning = false;
+                exitFlag = false;
+            }
+            else {
+                std::cout << "线程未在运行" << std::endl;
+            }
+            return 1;
+        }
+        case 'O':
+        case 'o': {
+            std::cout << "试图开启线程" << std::endl;
+            if (!isThreadRunning) {
+                exitFlag = false;
+                std::cout << "启动线程" << std::endl;
+                isThreadRunning = true;
+                action_Thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)ActionStart, hwnd_, 0, NULL);
+                if (action_Thread == NULL) {
+                    std::cerr << "无法创建线程" << std::endl;
+                }
+            }
+            else {
+                std::cout << "线程已经在运行" << std::endl;
+            }
+            return 1;
+        }
+        }
+    }
+
+    return CallNextHookEx(g_hHook, nCode, wParam, lParam);
+}
+
+void InstallHook()
+{
+    g_hHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, NULL, 0);
+}
+
+void UninstallHook()
+{
+    if (g_hHook != NULL)
+    {
+        UnhookWindowsHookEx(g_hHook);
+        g_hHook = NULL;
+    }
+}
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     bool isFirstComboEmpty = false;
@@ -938,44 +1004,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         switch (keyCode) {
 
-        case 'K':
-        case 'k':{
-            if (isThreadRunning) {
-                ActionStop();
-                if (action_Thread != NULL) {
-                    WaitForSingleObject(action_Thread, INFINITE);
-                    CloseHandle(action_Thread);
-                    std::cout << "停止线程" << std::endl;
-                    action_Thread = NULL;
-                }
-                isThreadRunning = false;
-                exitFlag = false;
-            }
-            else {
-                std::cout << "线程,启动?" << std::endl;
-                }
-            }
-            SetFocus(hwnd);
-            break;
-
-        case 'O':
-        case 'o':{
-            if (!isThreadRunning) {
-                exitFlag = false;
-                std::cout << "线程,启动" << std::endl;
-                isThreadRunning = true;
-                action_Thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)ActionStart, hwnd, 0, NULL);
-                if (action_Thread == NULL) {
-                    std::cerr << "无法创建线程" << std::endl;
-                }
-            }
-            else {
-                std::cout << "线程已经在运行" << std::endl;
-            }
-            }
-            SetFocus(hwnd);
-            break;
-
         case VK_DELETE: {
             int isInit = 0;
             int deleteIndex = SendMessage(GetDlgItem(hwnd, ID_LISTBOX), LB_GETCURSEL, 0, 0);
@@ -1040,6 +1068,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     int posY = (GetSystemMetrics(SM_CYSCREEN) - windowHeight) / 2;
     HWND hwnd = CreateWindowEx(0, L"Win_mcv0.0", L"操作控制v0.0-test", WS_OVERLAPPEDWINDOW | WS_THICKFRAME | WS_MAXIMIZEBOX,
         posX, posY, windowWidth, windowHeight, NULL, NULL, hInstance, NULL);
+    hwnd_ = hwnd;
 
     if (hwnd == NULL) {
         std::cout << "FAIL to create the hwnd" << std::endl;
@@ -1047,21 +1076,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
     ShowWindow(hwnd, nCmdShow);
 
+    InstallHook();
     MSG msg = { 0 };
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
+    UninstallHook();
 
     return msg.wParam;
 }
 
 int main() {
-    HWND consoleWindow = GetConsoleWindow();
-    ShowWindow(consoleWindow, SW_HIDE);
+    //HWND consoleWindow = GetConsoleWindow();
+    //ShowWindow(consoleWindow, SW_HIDE);
 
     LPSTR lpCmdLine = GetCommandLineA();
-   
+
     WinMain(GetModuleHandle(NULL), NULL, lpCmdLine, SW_SHOWNORMAL);
+
     return 0;
 }
