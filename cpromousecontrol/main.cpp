@@ -19,7 +19,8 @@ bool isThreadRunning = false;
 bool isVariblesExist = false;
 extern bool isSpecialPointShouldReget;
 std::atomic<bool> exitFlag(false);
-HWND hwnd_zt, hwnd_num, hwnd_location, hwnd_speed, hwnd_zt_text, hwnd_num_text, hwnd_concentrate, hwnd_normal_2, hwnd_time;
+HWND hwnd_zt, hwnd_num, hwnd_location, hwnd_speed, hwnd_zt_text, hwnd_num_text, hwnd_concentrate, hwnd_normal_2, hwnd_time,
+hwnd_loc_text, hwnd_speed_text, hwnd_time_text, hwnd_concentrate_text, hwnd_normal_2_text;
 HANDLE action_Thread = NULL;
 
 void separateAlphaNumeric(const std::string& str, std::string& alphaPart, std::vector<double>& num_vector);
@@ -205,8 +206,7 @@ void PushSettingIntoList(HWND hwnd) {
     return;
 }
 
-std::wstring FromListReadSetting(HWND hwnd) {
-    HWND hListBox = GetDlgItem(hwnd, ID_LISTBOX);
+std::wstring FromListReadSetting(HWND hListBox) {
     int itemCount = SendMessage(hListBox, LB_GETCOUNT, 0, 0); // 获取 ListBox 中项目的数量
     std::wstring reads = L"";
 
@@ -298,10 +298,8 @@ void FromSettingGetCommand(std::vector<std::string> lines) {
         break;
 
         case 2: {
-            std::cout << "nor 1" << std::endl;
             std::string alphaPart;
             separateAlphaNumeric(commands[0], alphaPart, num_part);
-            std::cout << "nor 1" << std::endl;
             inputs_2.speed = num_part[0];
             if (alphaPart == "ADDMOVE") {
                 inputs_2.L.x = num_part[1];
@@ -382,7 +380,7 @@ void separateAlphaNumeric(const std::string& str, std::string& alphaPart, std::v
 
     // 处理右侧数字部分
     while (i < str.length()) {
-        if (str[i] == ';' || str[i] == '&' && num_string!= "") {
+        if ((str[i] == ';' || str[i] == '&' )&& num_string!= "") {
             num_vector.push_back(std::stoi(num_string));
             num_string = "";
             ++i;
@@ -413,8 +411,9 @@ void Actions() {
 }
 
 void ActionStart(HWND hwnd) {
+    HWND hListBox = GetDlgItem(hwnd, ID_LISTBOX+1);
     std::wstring wreads;
-    wreads = FromListReadSetting(hwnd);
+    wreads = FromListReadSetting(hListBox);
     std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
     std::string reads = converter.to_bytes(wreads);
     std::stringstream ss(reads);
@@ -426,8 +425,21 @@ void ActionStart(HWND hwnd) {
         lines.push_back(line);
     }
     FromSettingGetCommand(lines);
+    Actions();//！下面的步骤要一定时间，导致出现时间空隙，待解决！
 
-    Sleep(3000);
+    hListBox = GetDlgItem(hwnd, ID_LISTBOX);
+    wreads = FromListReadSetting(hListBox);
+    reads = converter.to_bytes(wreads);
+    ss.clear();
+    ss.str(reads);
+    lines.clear();
+    line = "";
+
+    isSpecialPointShouldReget = true;
+    while (std::getline(ss, line, ',')) {
+        lines.push_back(line);
+    }
+    FromSettingGetCommand(lines);
     while (!exitFlag) {
         std::cout << "A NEW LOOP COME" << std::endl;
         Actions();
@@ -589,6 +601,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     if (hwnd_time != NULL) {
                         DestroyWindow(hwnd_time);
                         hwnd_time = NULL;
+                        DestroyWindow(hwnd_time_text);
+                        hwnd_time_text = NULL;
                     }
                     if (hwnd_location == NULL) {
                         int screenWidth = GetSystemMetrics(SM_CXSCREEN) / 2;
@@ -596,54 +610,74 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                         wchar_t title[24];
                         wsprintf(title, L"%d;%d", screenWidth, screenHeight);
                         hwnd_location = CreateWindowW(L"EDIT", title, WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 350, 130, 70, 20, hwnd, (HMENU)ID_TEXT_LOCATION, NULL, NULL);
+                        hwnd_loc_text = CreateWindowW(L"STATIC", L"坐标", WS_CHILD | WS_VISIBLE, 350, 150, 50, 20, hwnd, NULL, NULL, NULL);
                     }
                     if (hwnd_speed == NULL) {
                         hwnd_speed = CreateWindowW(L"EDIT", L"10", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 430, 130, 50, 20, hwnd, (HMENU)ID_TEXT_STEP, NULL, NULL);
+                        hwnd_speed_text = CreateWindowW(L"STATIC", L"速度", WS_CHILD | WS_VISIBLE, 430, 150, 50, 20, hwnd, NULL, NULL, NULL);
                     }
                     else {
                         DestroyWindow(hwnd_speed);
+                        DestroyWindow(hwnd_speed_text);
                         hwnd_speed = CreateWindowW(L"EDIT", L"10", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 430, 130, 50, 20, hwnd, (HMENU)ID_TEXT_STEP, NULL, NULL);
+                        hwnd_speed_text = CreateWindowW(L"STATIC", L"速度", WS_CHILD | WS_VISIBLE, 430, 150, 50, 20, hwnd, NULL, NULL, NULL);
                     }
                     break;
                 case 3:
                     if (hwnd_location != NULL) {
                         DestroyWindow(hwnd_location);
                         hwnd_location = NULL;
+                        DestroyWindow(hwnd_loc_text);
+                        hwnd_loc_text = NULL;
                     }
                     if (hwnd_speed == NULL) {
                         hwnd_speed = CreateWindowW(L"EDIT", L"8", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 350, 130, 50, 20, hwnd, (HMENU)ID_TEXT_STEP, NULL, NULL);
+                        hwnd_speed_text = CreateWindowW(L"STATIC", L"速度", WS_CHILD | WS_VISIBLE, 350, 150, 50, 20, hwnd, NULL, NULL, NULL);
                     }
                     else {
                         DestroyWindow(hwnd_speed);
+                        DestroyWindow(hwnd_speed_text);
                         hwnd_speed = CreateWindowW(L"EDIT", L"8", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 350, 130, 50, 20, hwnd, (HMENU)ID_TEXT_STEP, NULL, NULL);
+                        hwnd_speed_text = CreateWindowW(L"STATIC", L"速度", WS_CHILD | WS_VISIBLE, 350, 150, 50, 20, hwnd, NULL, NULL, NULL);
                     }
                     if (hwnd_time == NULL) {
-                        hwnd_time = CreateWindowW(L"EDIT", L"600", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 400, 130, 50, 20, hwnd, (HMENU)ID_TEXT_TIME_2, NULL, NULL);
+                        hwnd_time = CreateWindowW(L"EDIT", L"600", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 420, 130, 50, 20, hwnd, (HMENU)ID_TEXT_TIME_2, NULL, NULL);
+                        hwnd_time_text = CreateWindowW(L"STATIC", L"时间(ms)", WS_CHILD | WS_VISIBLE, 420, 150, 80, 20, hwnd, NULL, NULL, NULL);
                     }
                     else {
                         DestroyWindow(hwnd_time);
-                        hwnd_time = CreateWindowW(L"EDIT", L"600", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 400, 130, 50, 20, hwnd, (HMENU)ID_TEXT_TIME_2, NULL, NULL);
+                        DestroyWindow(hwnd_time_text);
+                        hwnd_time = CreateWindowW(L"EDIT", L"600", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 420, 130, 50, 20, hwnd, (HMENU)ID_TEXT_TIME_2, NULL, NULL);
+                        hwnd_time_text = CreateWindowW(L"STATIC", L"时间(ms)", WS_CHILD | WS_VISIBLE, 420, 150, 80, 20, hwnd, NULL, NULL, NULL);
                     }
                     break;
                 case 2:
                     //isShowSpeed = true;
                     if (hwnd_speed == NULL) {
                         hwnd_speed = CreateWindowW(L"EDIT", L"10", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 350, 130, 50, 20, hwnd, (HMENU)ID_TEXT_STEP, NULL, NULL);
+                        hwnd_speed_text = CreateWindowW(L"STATIC", L"速度", WS_CHILD | WS_VISIBLE, 350, 150, 50, 20, hwnd, NULL, NULL, NULL);
                     }
                     else {
                         DestroyWindow(hwnd_speed);
+                        DestroyWindow(hwnd_speed_text);
                         hwnd_speed = CreateWindowW(L"EDIT", L"10", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 350, 130, 50, 20, hwnd, (HMENU)ID_TEXT_STEP, NULL, NULL);
+                        hwnd_speed_text = CreateWindowW(L"STATIC", L"速度", WS_CHILD | WS_VISIBLE, 350, 150, 50, 20, hwnd, NULL, NULL, NULL);
                     }
                     if (hwnd_location != NULL) {
                         DestroyWindow(hwnd_location);
                         hwnd_location = NULL;
+                        DestroyWindow(hwnd_loc_text);
+                        hwnd_loc_text = NULL;
                     }
                     if (hwnd_time == NULL) {
-                        hwnd_time = CreateWindowW(L"EDIT", L"500", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 400, 130, 100, 20, hwnd, (HMENU)ID_TEXT_TIME_2, NULL, NULL);
+                        hwnd_time = CreateWindowW(L"EDIT", L"500", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 420, 130, 50, 20, hwnd, (HMENU)ID_TEXT_TIME_2, NULL, NULL);
+                        hwnd_time_text = CreateWindowW(L"STATIC", L"时间(ms)", WS_CHILD | WS_VISIBLE, 420, 150, 80, 20, hwnd, NULL, NULL, NULL);
                     }
                     else {
                         DestroyWindow(hwnd_time);
-                        hwnd_time = CreateWindowW(L"EDIT", L"500", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 400, 130, 100, 20, hwnd, (HMENU)ID_TEXT_TIME_2, NULL, NULL);
+                        DestroyWindow(hwnd_time_text);
+                        hwnd_time = CreateWindowW(L"EDIT", L"500", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 420, 130, 50, 20, hwnd, (HMENU)ID_TEXT_TIME_2, NULL, NULL);
+                        hwnd_time_text = CreateWindowW(L"STATIC", L"时间(ms)", WS_CHILD | WS_VISIBLE, 420, 150, 80, 20, hwnd, NULL, NULL, NULL);
                     }
                     break;
                 case 4:
@@ -660,6 +694,16 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     hwnd_normal_2 = NULL;
                     DestroyWindow(hwnd_time);
                     hwnd_time = NULL;
+                    DestroyWindow(hwnd_time_text);
+                    hwnd_time_text = NULL;
+                    DestroyWindow(hwnd_loc_text);
+                    hwnd_loc_text = NULL;
+                    DestroyWindow(hwnd_speed_text);
+                    hwnd_speed_text = NULL;
+                    DestroyWindow(hwnd_concentrate_text);
+                    hwnd_concentrate_text = NULL;
+                    DestroyWindow(hwnd_normal_2_text);
+                    hwnd_normal_2_text = NULL;
                     break;
                 default:
                     break;
@@ -674,12 +718,15 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 case 1:
                     if (hwnd_concentrate == NULL) {
                         hwnd_concentrate = CreateWindowW(L"EDIT", L"4", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 500, 130, 50, 20, hwnd, (HMENU)ID_TEXT_CONCENTRATE, NULL, NULL);
+                        hwnd_concentrate_text = CreateWindowW(L"STATIC", L"向心程度(越小越向心)", WS_CHILD | WS_VISIBLE, 500, 150, 150, 20, hwnd, NULL, NULL, NULL);
                     }
                     break;
                 case 0:
                 case 2:
                     DestroyWindow(hwnd_concentrate);
                     hwnd_concentrate = NULL;
+                    DestroyWindow(hwnd_concentrate_text);
+                    hwnd_concentrate_text = NULL;
                 default:
                     break;
                 }
@@ -693,12 +740,15 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 case 1:
                     if (hwnd_normal_2 == NULL) {
                         hwnd_normal_2 = CreateWindowW(L"EDIT", L"10", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 650, 130, 50, 20, hwnd, (HMENU)ID_TEXT_NORMALDISTRIBUTION_2, NULL, NULL);
+                        hwnd_normal_2_text = CreateWindowW(L"STATIC", L"标准差", WS_CHILD | WS_VISIBLE, 700, 130, 50, 20, hwnd, NULL, NULL, NULL);
                     }
                     break;
                 case 0:
                 case 2:
                     DestroyWindow(hwnd_normal_2);
                     hwnd_normal_2 = NULL;
+                    DestroyWindow(hwnd_normal_2_text);
+                    hwnd_normal_2_text = NULL;
                 default:
                     break;
                 }
@@ -982,14 +1032,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     WNDCLASS wc = { 0 };
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
-    wc.lpszClassName = L"mcv0.0";
+    wc.lpszClassName = L"Win_mcv0.0";
     RegisterClass(&wc);
 
     int windowWidth = 800;
     int windowHeight = 400;
     int posX = (GetSystemMetrics(SM_CXSCREEN) - windowWidth) / 2;
     int posY = (GetSystemMetrics(SM_CYSCREEN) - windowHeight) / 2;
-    HWND hwnd = CreateWindowEx(0, L"mcv0.0", L"鼠标控制v0.0-test", WS_OVERLAPPEDWINDOW | WS_THICKFRAME | WS_MAXIMIZEBOX,
+    HWND hwnd = CreateWindowEx(0, L"Win_mcv0.0", L"操作控制v0.0-test", WS_OVERLAPPEDWINDOW | WS_THICKFRAME | WS_MAXIMIZEBOX,
         posX, posY, windowWidth, windowHeight, NULL, NULL, hInstance, NULL);
 
     if (hwnd == NULL) {
@@ -1008,8 +1058,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 }
 
 int main() {
-    //HWND consoleWindow = GetConsoleWindow();
-    //ShowWindow(consoleWindow, SW_HIDE);
+    HWND consoleWindow = GetConsoleWindow();
+    ShowWindow(consoleWindow, SW_HIDE);
 
     LPSTR lpCmdLine = GetCommandLineA();
    
