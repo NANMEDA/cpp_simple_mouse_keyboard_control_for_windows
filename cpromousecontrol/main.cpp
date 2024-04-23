@@ -1057,8 +1057,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 }
 
 int main() {
-    //HWND consoleWindow = GetConsoleWindow();
-    //ShowWindow(consoleWindow, SW_HIDE);
+    HWND consoleWindow = GetConsoleWindow();
+    ShowWindow(consoleWindow, SW_HIDE);
 
     LPSTR lpCmdLine = GetCommandLineA();
    
